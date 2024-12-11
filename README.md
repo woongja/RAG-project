@@ -17,9 +17,11 @@ This is a Retrieval-Augmented Generation (RAG) chatbot built using LangChain, AW
 
 ## Usage
 1. LLM Integration (Bedrock + Claude Model)
+    ```bash
     streamlit run frontend.py
 
 2. Vector Store (RAG) Construction
+    ```bash
     streamlit run frontend_1.py
 
 ### How to Update the Knowledge Base
