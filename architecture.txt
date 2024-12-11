@@ -1,0 +1,24 @@
+project/
+│
+├── backend.py        # 백엔드 로직
+│   ├─ Bedrock(Claude) LLM 연동 로직 포함
+│   ├─ docs 폴더 내 txt 파일 로드 및 임베딩 -> Chroma 벡터 스토어 관리
+│   ├─ add_new_information() 함수를 통한 최신 정보 반영
+│   ├─ cnvs_chain() 함수로 질의 처리 (RAG → fallback)
+│
+├── frontend.py       # 프론트엔드 로직 (Streamlit)
+│   ├─ 사용자 UI (채팅형 인터페이스) 구현
+│   ├─ 사용자 입력 받기 및 backend.py의 cnvs_chain 함수 호출
+│   ├─ 세션 상태로 대화 기록 및 메모리 관리
+│
+├── db_init.py        # 데이터베이스 초기화 스크립트(선택 사항)
+│   ├─ knowledge_base.db 초기화(테이블 생성, 기본 데이터 삽입 등)
+│   ├─ 필요 시, 추후 DB에 question-answer 데이터 관리 가능
+│
+├── knowledge_base.db # SQLite DB 파일 (DB 사용 시)
+│
+├── docs/             # 최신 정보 텍스트 파일 저장 디렉토리
+│   ├─ ... (여러 .txt 파일들)
+│
+└── chroma_db/        # Chroma 벡터 스토어 데이터 유지 디렉토리
+    ├─ ... (임베딩 메타데이터, 인덱스 등 저장)

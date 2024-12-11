@@ -1,0 +1,8 @@
+langchain==0.0.300       # LangChain 핵심 라이브러리
+streamlit==1.25.0        # Streamlit 웹 UI
+chromadb==0.4.2          # Chroma 벡터 스토어
+sentence-transformers==2.2.2  # 임베딩 생성용 (Hugging Face Embeddings)
+boto3==1.28.0            # AWS SDK for Python (Bedrock 연동)
+langchain_community==0.0.9  # BedrockChat 등 community 제공 LLM 연결 모듈
+tiktoken==0.4.0          # 토큰화 유틸 (LangChain에서 사용)
+requests==2.31.0         # HTTP 요청 라이브러리
