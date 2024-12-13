@@ -7,3 +7,6 @@ langchain_community
 tiktoken
 requests
 pymupdf
+tiktoken
+numpy
+torch

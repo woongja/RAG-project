@@ -27,4 +27,4 @@ This is a Retrieval-Augmented Generation (RAG) chatbot built using LangChain, AW
 
 ### How to Update the Knowledge Base
 
-The chatbot relies on a knowledge base stored locally in the docs/ directory. To update or expand the knowledge base, you can add .txt files containing the desired information. These files will be processed and embedded into the vector store for retrieval during queries.
+The chatbot relies on a knowledge base stored locally in the data/ directory. To update or expand the knowledge base, you can add .txt .pdf files containing the desired information. These files will be processed and embedded into the vector store for retrieval during queries.

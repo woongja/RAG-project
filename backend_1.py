@@ -6,6 +6,7 @@ from langchain.chains import ConversationChain
 from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import Chroma
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import boto3
 import glob
 from datetime import datetime
@@ -96,8 +97,25 @@ def add_new_information(text: str):
     processed_docs.append(filename)
     save_processed_docs(processed_docs)
 
-# 앱 시작 시 docs 폴더 내 아직 처리되지 않은 파일만 임베딩
-def process_new_docs():
+# 텍스트 분할을 위한 TextSplitter 초기화
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,  # 각 Chunk의 최대 길이 (문자 수)
+    chunk_overlap=50  # Chunk 간 겹치는 부분
+)
+
+def split_text_into_chunks(text):
+    """
+    긴 텍스트를 Chunk 단위로 분할.
+    """
+    chunks = text_splitter.split_text(text)
+    return [Document(page_content=chunk) for chunk in chunks]
+
+# 앱 시작 시 data 폴더 내 아직 처리되지 않은 파일만 임베딩
+def process_new_data():
+    """
+    Process new files in the 'data' directory, split them into chunks, 
+    and update the vector store.
+    """
     processed_docs = load_processed_docs()
     new_docs = []
     
@@ -119,8 +137,9 @@ def process_new_docs():
                 print(f"Unsupported file format: {file_path}")
                 continue
             
-            # 문서 추가
-            new_docs.append(Document(page_content=content))
+            # 텍스트를 Chunk 단위로 분할
+            chunks = split_text_into_chunks(content)
+            new_docs.extend(chunks)  # 모든 Chunk를 새 문서로 추가
             processed_docs.append(filename)
     
     # 새 문서를 벡터 스토어에 추가 및 저장
@@ -128,10 +147,11 @@ def process_new_docs():
         vectorstore.add_documents(new_docs)
         vectorstore.persist()
         save_processed_docs(processed_docs)
+        print(f"Processed and saved {len(new_docs)} new chunks.")
 
 
 # 실행 시 새로운 문서만 추가
-process_new_docs()
+process_new_data()
     
 def cnvs_chain(input_text, memory):
     # 1. 벡터 스토어에서 문서 검색
