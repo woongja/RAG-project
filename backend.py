@@ -3,9 +3,8 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
 from langchain.chains import RetrievalQA
 import boto3
-import sqlite3
 
-# AWS 세션 설정
+# AWS 세션 설정s
 session = boto3.Session(profile_name="default", region_name="ap-northeast-2")
 bedrock_client = session.client("bedrock-runtime", region_name="ap-northeast-2")
 

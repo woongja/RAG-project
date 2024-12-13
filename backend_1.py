@@ -33,7 +33,6 @@ def buff_memory():
     memory = ConversationBufferMemory(return_messages=True)
     return memory
 
-
 # 메타데이터 파일 경로
 METADATA_FILE = "processed_data.json"
 
@@ -56,7 +55,7 @@ def save_processed_docs(processed_docs):
 
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2",
-    model_kwargs={'device': 'cuda:2'}  # CPU에서 실행
+    model_kwargs={'device': 'cuda:1'}  # CPU에서 실행
 )
 
 # 벡터 스토어가 이미 있으면 로드, 없으면 새로 생성
@@ -103,7 +102,7 @@ def process_new_docs():
     new_docs = []
     
     # docs 폴더에서 TXT와 PDF 파일 처리
-    for file_path in glob.glob("docs/*"):
+    for file_path in glob.glob("data/*"):
         filename = os.path.basename(file_path)
         if filename not in processed_docs:
             if file_path.endswith(".txt"):
