@@ -11,6 +11,10 @@ import glob
 from datetime import datetime
 import json
 import os
+import torch
+import fitz #pdf 불러오기
+
+torch.cuda.empty_cache()
 
 # AWS 세션 설정 (Bedrock)
 session = boto3.Session(profile_name="default", region_name="ap-northeast-2")
@@ -31,7 +35,7 @@ def buff_memory():
 
 
 # 메타데이터 파일 경로
-METADATA_FILE = "processed_docs.json"
+METADATA_FILE = "processed_data.json"
 
 def load_processed_docs():
     if os.path.exists(METADATA_FILE):
@@ -50,7 +54,10 @@ def save_processed_docs(processed_docs):
 # document_list는 사전에 로드한 문서 리스트라고 가정
 # 예: document_list = [Document(page_content="최신 정보 텍스트1"), Document(page_content="최신 정보 텍스트2"), ...]
 
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_kwargs={'device': 'cuda:2'}  # CPU에서 실행
+)
 
 # 벡터 스토어가 이미 있으면 로드, 없으면 새로 생성
 if os.path.exists("./chroma_db"):
@@ -60,11 +67,24 @@ else:
 
 retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k":3})
 
+# PDF에서 텍스트 추출 함수
+def extract_text_from_pdf(pdf_path):
+    try:
+        pdf_document = fitz.open(pdf_path)  # PDF 열기
+        text = ""
+        for page in pdf_document:
+            text += page.get_text()  # 페이지 텍스트 추출
+        pdf_document.close()
+        return text
+    except Exception as e:
+        print(f"Error processing PDF {pdf_path}: {e}")
+        return None
+
 def add_new_information(text: str):
-    if not os.path.exists("docs"):
-        os.makedirs("docs")
+    if not os.path.exists("data"):
+        os.makedirs("data")
     filename = f"latest_info_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.txt"
-    file_path = os.path.join("docs", filename)
+    file_path = os.path.join("data", filename)
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(text)
 
@@ -81,19 +101,35 @@ def add_new_information(text: str):
 def process_new_docs():
     processed_docs = load_processed_docs()
     new_docs = []
-    for file_path in glob.glob("docs/*.txt"):
+    
+    # docs 폴더에서 TXT와 PDF 파일 처리
+    for file_path in glob.glob("docs/*"):
         filename = os.path.basename(file_path)
         if filename not in processed_docs:
-            # 새로운 문서
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            if file_path.endswith(".txt"):
+                # TXT 파일 처리
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+            elif file_path.endswith(".pdf"):
+                # PDF 파일 처리
+                content = extract_text_from_pdf(file_path)
+                if not content:  # PDF 텍스트 추출 실패 시 건너뜀
+                    print(f"Skipping empty or invalid PDF: {file_path}")
+                    continue
+            else:
+                print(f"Unsupported file format: {file_path}")
+                continue
+            
+            # 문서 추가
             new_docs.append(Document(page_content=content))
             processed_docs.append(filename)
     
+    # 새 문서를 벡터 스토어에 추가 및 저장
     if new_docs:
         vectorstore.add_documents(new_docs)
         vectorstore.persist()
         save_processed_docs(processed_docs)
+
 
 # 실행 시 새로운 문서만 추가
 process_new_docs()

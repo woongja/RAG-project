@@ -2,7 +2,7 @@ project/
 │
 ├── backend_1.py        # 백엔드 로직
 │   ├─ Bedrock(Claude) LLM 연동 로직 포함
-│   ├─ docs 폴더 내 txt 파일 로드 및 임베딩 -> Chroma 벡터 스토어 관리
+│   ├─ data 폴더 내 txt, pdf 파일 로드 및 임베딩 -> Chroma 벡터 스토어 관리
 │   ├─ add_new_information() 함수를 통한 최신 정보 반영
 │   ├─ cnvs_chain() 함수로 질의 처리 (RAG → fallback)
 │
@@ -11,7 +11,7 @@ project/
 │   ├─ 사용자 입력 받기 및 backend.py의 cnvs_chain 함수 호출
 │   ├─ 세션 상태로 대화 기록 및 메모리 관리
 │
-├── docs/             # 최신 정보 텍스트 파일 저장 디렉토리
+├── data/             # 최신 정보 텍스트 파일 저장 디렉토리
 │   ├─ ... (여러 .txt 파일들)
 │
 └── chroma_db/        # Chroma 벡터 스토어 데이터 유지 디렉토리
