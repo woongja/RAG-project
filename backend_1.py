@@ -1,5 +1,4 @@
-# backend.py
-
+# backend_1.py
 from langchain_community.chat_models import BedrockChat
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
@@ -15,7 +14,6 @@ from datetime import datetime
 import json
 import os
 import torch
-import fitz #pdf 불러오기
 
 torch.cuda.empty_cache()
 
