@@ -7,6 +7,8 @@ from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyMuPDFLoader
+from langchain.document_loaders import TextLoader
 import boto3
 import glob
 from datetime import datetime
@@ -48,14 +50,9 @@ def save_processed_docs(processed_docs):
     with open(METADATA_FILE, "w", encoding="utf-8") as f:
         json.dump(processed_docs, f, ensure_ascii=False, indent=4)
 
-# ---------------------
-# 벡터 스토어 초기화
-# ---------------------
-# document_list는 사전에 로드한 문서 리스트라고 가정
-# 예: document_list = [Document(page_content="최신 정보 텍스트1"), Document(page_content="최신 정보 텍스트2"), ...]
 
 embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_name="sentence-transformers/multi-qa-mpnet-base-dot-v1",
     model_kwargs={'device': 'cuda:1'}  # CPU에서 실행
 )
 
@@ -64,21 +61,6 @@ if os.path.exists("./chroma_db"):
     vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
 else:
     vectorstore = Chroma(embedding_function=embeddings, persist_directory="./chroma_db")
-
-retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k":3})
-
-# PDF에서 텍스트 추출 함수
-def extract_text_from_pdf(pdf_path):
-    try:
-        pdf_document = fitz.open(pdf_path)  # PDF 열기
-        text = ""
-        for page in pdf_document:
-            text += page.get_text()  # 페이지 텍스트 추출
-        pdf_document.close()
-        return text
-    except Exception as e:
-        print(f"Error processing PDF {pdf_path}: {e}")
-        return None
 
 def add_new_information(text: str):
     if not os.path.exists("data"):
@@ -99,47 +81,40 @@ def add_new_information(text: str):
 
 # 텍스트 분할을 위한 TextSplitter 초기화
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,  # 각 Chunk의 최대 길이 (문자 수)
-    chunk_overlap=50  # Chunk 간 겹치는 부분
+    chunk_size=300,  # 각 Chunk의 최대 길이 (문자 수)
+    chunk_overlap=30  # Chunk 간 겹치는 부분
 )
 
-def split_text_into_chunks(text):
-    """
-    긴 텍스트를 Chunk 단위로 분할.
-    """
-    chunks = text_splitter.split_text(text)
-    return [Document(page_content=chunk) for chunk in chunks]
 
 # 앱 시작 시 data 폴더 내 아직 처리되지 않은 파일만 임베딩
 def process_new_data():
-    """
-    Process new files in the 'data' directory, split them into chunks, 
-    and update the vector store.
-    """
     processed_docs = load_processed_docs()
     new_docs = []
-    
-    # docs 폴더에서 TXT와 PDF 파일 처리
+
+    # data 폴더에서 TXT와 PDF 파일 처리
     for file_path in glob.glob("data/*"):
         filename = os.path.basename(file_path)
-        if filename not in processed_docs:
-            if file_path.endswith(".txt"):
-                # TXT 파일 처리
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-            elif file_path.endswith(".pdf"):
-                # PDF 파일 처리
-                content = extract_text_from_pdf(file_path)
-                if not content:  # PDF 텍스트 추출 실패 시 건너뜀
-                    print(f"Skipping empty or invalid PDF: {file_path}")
-                    continue
-            else:
-                print(f"Unsupported file format: {file_path}")
-                continue
-            
-            # 텍스트를 Chunk 단위로 분할
-            chunks = split_text_into_chunks(content)
-            new_docs.extend(chunks)  # 모든 Chunk를 새 문서로 추가
+        if filename in processed_docs:
+            continue  # 이미 처리된 파일 건너뜀
+
+        print(f"Processing file: {filename}")
+        if file_path.endswith(".pdf"):
+            loader = PyMuPDFLoader(file_path)
+            docs = loader.load()
+        elif file_path.endswith(".txt"):
+            loader = TextLoader(file_path, encoding="utf-8")
+            docs = loader.load()
+        else:
+            print(f"Unsupported file format: {file_path}")
+            continue
+
+        # 텍스트 분할
+        split_documents = text_splitter.split_documents(docs)
+        chunk_count = len(split_documents)
+        print(f"File '{filename}' split into {chunk_count} chunks.")
+
+        if chunk_count > 0:
+            new_docs.extend(split_documents)
             processed_docs.append(filename)
     
     # 새 문서를 벡터 스토어에 추가 및 저장
@@ -149,21 +124,38 @@ def process_new_data():
         save_processed_docs(processed_docs)
         print(f"Processed and saved {len(new_docs)} new chunks.")
 
+# 전체 문서 수 가져오기
+total_docs = vectorstore._collection.count()
 
 # 실행 시 새로운 문서만 추가
 process_new_data()
-    
+retriever = vectorstore.as_retriever(
+    search_type="similarity",
+    search_kwargs={
+        "k": total_docs
+    }
+)
+
 def cnvs_chain(input_text, memory):
     # 1. 벡터 스토어에서 문서 검색
     docs = retriever.get_relevant_documents(input_text) if retriever else []
 
     if docs:
-        # RAG: 관련 문서가 있을 경우 해당 문서를 컨텍스트로 LLM 응답
-        context = "\n\n".join([d.page_content for d in docs])
-        prompt = f"제공된 문서를 우선적으로 참고하되, 문서에 없는 내용에 대해서는 당신이 알고 있는 다른 지식을 활용하여 질문에 답변해주세요.\n\n문서:\n{context}\n\n질문: {input_text}"
+        # 각 문서를 구분하여 컨텍스트 생성
+        context = "\n\n".join(
+            [f"Document {i+1}:\n{d.page_content}" for i, d in enumerate(docs)]
+        )
+        prompt = f"""제공된 문서를 우선적으로 참고하되, 문서에 없는 내용에 대해서는 당신이 알고 있는 다른 지식을 활용하여 질문에 답변해주세요.
+
+        문서:
+        {context}
+
+        질문: {input_text}"""
     else:
-        # DB에도 없으면 기존 LLM 대화
-        prompt = input_text
+        # 검색 결과가 없을 경우 기본 프롬프트 생성
+        prompt = f"질문: {input_text}"
+
+    # LLM 호출 및 응답 생성
     chain_data = bedrock_chatbot()
     cnvs_chain = ConversationChain(llm=chain_data, memory=memory, verbose=True)
     chat_reply = cnvs_chain.predict(input=prompt)
